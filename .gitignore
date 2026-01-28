@@ -1,0 +1,11 @@
+# R files
+.Rhistory
+.RData
+.Rproj.user/
+
+# Data files (large, can be regenerated)
+data/raw/*.rds
+
+# System files
+.DS_Store
+Thumbs.db

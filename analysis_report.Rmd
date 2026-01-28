@@ -1,0 +1,203 @@
+---
+title: "Stock Portfolio Risk-Return Analysis"
+author: "Arwin Sadafian"
+date: "January 28, 2026"
+output: html_document
+---
+## Executive Summary
+
+This analysis examines 8 stocks across different sectors from 2020-2025 to build and compare portfolio strategies. Key findings:
+
+- **Best performing portfolio**: Equal Weight strategy
+- **Best risk-adjusted returns**: Equal Weight (highest Sharpe Ratio)
+- **Most volatile stock**: TSLA
+- **Most stable stock**: JNJ
+- **Statistical validation**: Equal and Sector portfolios significantly outperformed the S&P 500
+
+## Data Overview
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+
+# Load all data
+prices <- readRDS("data/processed/prices_clean.rds")
+returns <- readRDS("data/processed/returns_clean.rds")
+portfolio_returns <- readRDS("data/processed/portfolio_returns.rds")
+portfolio_cumulative <- readRDS("data/processed/portfolio_cumulative.rds")
+metrics <- readRDS("data/processed/portfolio_metrics.rds")
+
+tickers <- c("AAPL", "MSFT", "JPM", "JNJ", "XOM", "WMT", "DIS", "TSLA")
+```
+
+**Stocks analyzed:** `r paste(tickers, collapse = ", ")`
+
+**Time period:** `r min(prices$Date)` to `r max(prices$Date)`
+
+**Trading days:** `r nrow(returns)`
+
+## Stock Performance
+
+### Price History (Normalized)
+```{r price-chart, fig.width=10, fig.height=5}
+prices_normalized <- prices
+for(col in tickers) {
+  prices_normalized[[col]] <- prices[[col]] / prices[[col]][1] * 100
+}
+
+prices_norm_long <- pivot_longer(prices_normalized,
+                                  cols = all_of(tickers),
+                                  names_to = "Stock",
+                                  values_to = "Price")
+
+ggplot(prices_norm_long, aes(x = Date, y = Price, color = Stock)) +
+  geom_line() +
+  geom_hline(yintercept = 100, linetype = "dashed", color = "gray") +
+  labs(title = "Normalized Stock Prices (Starting at 100)",
+       x = "Date",
+       y = "Indexed Price") +
+  theme_minimal()
+```
+
+### Return Statistics
+```{r return-stats}
+stats <- data.frame(
+  Ticker = tickers,
+  Mean_Return = round(sapply(returns[, tickers], mean), 3),
+  Std_Dev = round(sapply(returns[, tickers], sd), 3),
+  Min = round(sapply(returns[, tickers], min), 2),
+  Max = round(sapply(returns[, tickers], max), 2)
+)
+knitr::kable(stats, caption = "Daily Return Statistics (%)")
+```
+## Risk Analysis
+
+### Return Distribution
+```{r boxplot, fig.width=10, fig.height=5}
+returns_long <- pivot_longer(returns, 
+                              cols = all_of(tickers),
+                              names_to = "Stock",
+                              values_to = "Return")
+
+ggplot(returns_long, aes(x = Stock, y = Return, fill = Stock)) +
+  geom_boxplot() +
+  labs(title = "Distribution of Daily Returns by Stock",
+       x = "Stock",
+       y = "Daily Return (%)") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+### Correlation Analysis
+```{r correlation, fig.width=8, fig.height=6}
+cor_matrix <- cor(returns[, tickers])
+cor_melted <- melt(cor_matrix)
+
+ggplot(cor_melted, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  geom_text(aes(label = round(value, 2)), color = "black", size = 3) +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  labs(title = "Stock Return Correlations",
+       x = "", y = "", fill = "Correlation") +
+  theme_minimal()
+```
+
+**Key observations:**
+
+- AAPL and MSFT have the highest correlation (0.71) - both are tech stocks
+- TSLA and JNJ have low correlation - good for diversification
+
+## Portfolio Strategies
+
+Three portfolio strategies were constructed:
+
+1. **Equal Weight**: 12.5% in each stock
+2. **Inverse Volatility**: Higher weight to stable stocks, lower to volatile
+3. **Sector-Balanced**: Weights based on sector allocation
+
+### Portfolio Weights
+```{r weights}
+n_stocks <- length(tickers)
+equal_weights <- rep(1/n_stocks, n_stocks)
+
+volatilities <- sapply(returns[, tickers], sd)
+inverse_vol <- 1 / volatilities
+vol_weights <- inverse_vol / sum(inverse_vol)
+
+sector_weights <- c(0.10, 0.10, 0.20, 0.20, 0.10, 0.10, 0.10, 0.10)
+
+weights_df <- data.frame(
+  Ticker = tickers,
+  Equal = round(equal_weights, 3),
+  Volatility = round(vol_weights, 3),
+  Sector = sector_weights
+)
+knitr::kable(weights_df, caption = "Portfolio Weights by Strategy")
+```
+
+### Portfolio Performance
+```{r portfolio-chart, fig.width=10, fig.height=5}
+portfolio_long <- pivot_longer(portfolio_cumulative,
+                                cols = c(Equal, Volatility, Sector, SP500),
+                                names_to = "Portfolio",
+                                values_to = "Value")
+
+ggplot(portfolio_long, aes(x = Date, y = Value, color = Portfolio)) +
+  geom_line() +
+  geom_hline(yintercept = 100, linetype = "dashed", color = "gray") +
+  labs(title = "Portfolio Performance: Growth of $100",
+       x = "Date",
+       y = "Portfolio Value ($)") +
+  theme_minimal()
+```
+
+### Performance Metrics
+```{r metrics}
+knitr::kable(metrics, caption = "Portfolio Performance Comparison")
+```
+## Statistical Testing
+
+### Key Findings
+```{r stat-tests}
+# Test if portfolios beat SP500
+equal_test <- t.test(portfolio_returns$Equal, portfolio_returns$SP500, paired = TRUE)
+sector_test <- t.test(portfolio_returns$Sector, portfolio_returns$SP500, paired = TRUE)
+vol_test <- t.test(portfolio_returns$Volatility, portfolio_returns$SP500, paired = TRUE)
+
+test_results <- data.frame(
+  Portfolio = c("Equal", "Volatility", "Sector"),
+  Mean_Difference = round(c(
+    mean(portfolio_returns$Equal - portfolio_returns$SP500),
+    mean(portfolio_returns$Volatility - portfolio_returns$SP500),
+    mean(portfolio_returns$Sector - portfolio_returns$SP500)
+  ), 4),
+  P_Value = round(c(equal_test$p.value, vol_test$p.value, sector_test$p.value), 4),
+  Significant = c(
+    ifelse(equal_test$p.value < 0.05, "Yes", "No"),
+    ifelse(vol_test$p.value < 0.05, "Yes", "No"),
+    ifelse(sector_test$p.value < 0.05, "Yes", "No")
+  )
+)
+knitr::kable(test_results, caption = "T-Test: Portfolio vs S&P 500")
+```
+
+### Normality of Returns
+
+Stock returns do not follow a normal distribution (Shapiro-Wilk test, all p < 0.001). This indicates fat tails and the presence of extreme events, which is typical for financial data.
+
+## Conclusions
+
+1. **Equal Weight portfolio performed best** with the highest total return and Sharpe ratio
+2. **Diversification works**: Including stocks from different sectors reduced overall portfolio volatility
+3. **TSLA offers high returns but high risk**: Suitable for aggressive investors only
+4. **JNJ provides stability**: Lowest volatility, good for risk-averse investors
+5. **Statistical evidence**: Equal and Sector portfolios significantly outperformed the S&P 500 benchmark
+
+## Limitations
+
+- Analysis covers only 5 years (2020-2025)
+- Only 8 stocks examined
+- Past performance does not guarantee future results
+- Transaction costs and taxes not considered

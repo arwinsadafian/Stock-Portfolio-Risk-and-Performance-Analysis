@@ -1,0 +1,5 @@
+"Test","Result"
+"Individual stock returns != 0","AAPL, WMT, TSLA significant"
+"Equal beats SP500","YES (significant)"
+"Sector beats SP500","YES (significant)"
+"Returns normally distributed","NO (none are normal)"

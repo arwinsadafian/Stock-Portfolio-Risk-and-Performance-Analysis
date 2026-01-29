@@ -4,7 +4,7 @@ An R-based analysis of stock portfolio strategies comparing risk and return metr
 
 ## Overview
 
-This project analyzes 8 stocks across different sectors (2020-2025) to:
+This project analyzes 20 stocks across different sectors (2015-2025) to:
 - Compare individual stock performance and volatility
 - Build and evaluate 3 portfolio strategies
 - Test portfolio performance against S&P 500 benchmark
@@ -12,28 +12,29 @@ This project analyzes 8 stocks across different sectors (2020-2025) to:
 
 ## Stocks Analyzed
 
-| Ticker | Company | Sector |
-|--------|---------|--------|
-| AAPL | Apple | Technology |
-| MSFT | Microsoft | Technology |
-| JPM | JPMorgan Chase | Finance |
-| JNJ | Johnson & Johnson | Healthcare |
-| XOM | ExxonMobil | Energy |
-| WMT | Walmart | Retail |
-| DIS | Disney | Entertainment |
-| TSLA | Tesla | Automotive |
+| Sector | Stocks |
+|--------|--------|
+| Technology | AAPL, MSFT, GOOGL, NVDA |
+| Finance | JPM, V, BAC |
+| Healthcare | JNJ, PFE, UNH |
+| Energy | XOM, CVX |
+| Retail | WMT, AMZN, COST |
+| Entertainment | DIS, NFLX |
+| Automotive | TSLA, F |
+| Industrial | CAT |
 
 ## Portfolio Strategies
 
-1. **Equal Weight** - 12.5% allocation to each stock
-2. **Inverse Volatility** - Higher weight to stable stocks
-3. **Sector-Balanced** - Weights based on sector diversification
+1. **Equal Weight** - 5% allocation to each stock
+2. **Inverse Volatility** - Higher weight to stable stocks, lower to volatile
+3. **Sector-Balanced** - Weights based on sector allocation (Tech 25%, Healthcare 15%, Finance 15%, Retail 15%, Energy 10%, Entertainment 10%, Automotive 5%, Industrial 5%)
 
 ## Key Findings
 
-- Equal Weight portfolio achieved the highest return and Sharpe ratio
-- TSLA showed highest volatility, JNJ showed lowest
-- Equal and Sector portfolios significantly outperformed S&P 500 (p < 0.05)
+- Sector-Balanced portfolio achieved the highest total return
+- NVDA showed highest growth (top performer over 10 years)
+- 13 out of 20 stocks showed statistically significant positive returns
+- All portfolios significantly outperformed S&P 500 (p < 0.05)
 - Stock returns are not normally distributed (fat tails present)
 
 ## Project Structure

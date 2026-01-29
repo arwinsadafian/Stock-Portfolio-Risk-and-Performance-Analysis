@@ -7,7 +7,24 @@ prices <- readRDS("data/processed/prices_clean.rds")
 returns <- readRDS("data/processed/returns_clean.rds")
 
 # Define tickers
-tickers <- c("AAPL", "MSFT", "JPM", "JNJ", "XOM", "WMT", "DIS", "TSLA")
+tickers <- c(
+  # Technology
+  "AAPL", "MSFT", "GOOGL", "NVDA",
+  # Finance
+  "JPM", "V", "BAC",
+  # Healthcare
+  "JNJ", "PFE", "UNH",
+  # Energy
+  "XOM", "CVX",
+  # Retail
+  "WMT", "AMZN", "COST",
+  # Entertainment
+  "DIS", "NFLX",
+  # Automotive
+  "TSLA", "F",
+  # Industrial
+  "CAT"
+)
 
 # Summary statistics for returns
 print("Summary statistics for daily returns (%):")
@@ -51,7 +68,7 @@ prices_long <- tidyr::pivot_longer(prices,
 
 ggplot(prices_long, aes(x = Date, y = Price, color = Stock)) +
   geom_line() +
-  labs(title = "Stock Prices Over Time (2020-2025)",
+  labs(title = "Stock Prices Over Time (2015-2025)",
        x = "Date",
        y = "Price ($)") +
   theme_minimal()
@@ -66,23 +83,52 @@ for(col in tickers) {
   prices_normalized[[col]] <- prices[[col]] / prices[[col]][1] * 100
 }
 
-# Create normalized price chart
-prices_norm_long <- tidyr::pivot_longer(prices_normalized,
-                                        cols = all_of(tickers),
-                                        names_to = "Stock",
-                                        values_to = "Price")
+# Create normalized price chart - Top and Bottom performers
+# Calculate total return for each stock
+total_returns <- sapply(tickers, function(t) {
+  (prices_normalized[[t]][nrow(prices_normalized)] / 100 - 1) * 100
+})
+total_returns_sorted <- sort(total_returns, decreasing = TRUE)
 
-ggplot(prices_norm_long, aes(x = Date, y = Price, color = Stock)) +
+# Get top 5 and bottom 5
+top_5 <- names(total_returns_sorted)[1:5]
+bottom_5 <- names(total_returns_sorted)[16:20]
+
+# Top performers chart
+prices_top <- tidyr::pivot_longer(prices_normalized,
+                                  cols = all_of(top_5),
+                                  names_to = "Stock",
+                                  values_to = "Price")
+
+ggplot(prices_top, aes(x = Date, y = Price, color = Stock)) +
   geom_line() +
   geom_hline(yintercept = 100, linetype = "dashed", color = "gray") +
-  labs(title = "Normalized Stock Prices (Starting at 100)",
+  scale_y_log10() +
+  labs(title = "Top 5 Performing Stocks (Log Scale)",
        x = "Date",
        y = "Indexed Price (Start = 100)") +
   theme_minimal()
 
-# Save the plot
-ggsave("output/figures/price_normalized.png", width = 12, height = 6)
-print("Saved normalized price chart to output/figures/")
+ggsave("output/figures/price_normalized_top5.png", width = 10, height = 6)
+print("Saved top 5 performers chart")
+
+# Bottom performers chart
+prices_bottom <- tidyr::pivot_longer(prices_normalized,
+                                     cols = all_of(bottom_5),
+                                     names_to = "Stock",
+                                     values_to = "Price")
+
+ggplot(prices_bottom, aes(x = Date, y = Price, color = Stock)) +
+  geom_line() +
+  geom_hline(yintercept = 100, linetype = "dashed", color = "gray") +
+  scale_y_log10() +
+  labs(title = "Bottom 5 Performing Stocks (Log Scale)",
+       x = "Date",
+       y = "Indexed Price (Start = 100)") +
+  theme_minimal()
+
+ggsave("output/figures/price_normalized_bottom5.png", width = 10, height = 6)
+print("Saved bottom 5 performers chart")
 
 # Calculate correlation matrix
 cor_matrix <- cor(returns[, tickers])
@@ -96,12 +142,13 @@ cor_melted <- melt(cor_matrix)
 
 ggplot(cor_melted, aes(x = Var1, y = Var2, fill = value)) +
   geom_tile() +
-  geom_text(aes(label = round(value, 2)), color = "black", size = 3) +
+  geom_text(aes(label = round(value, 2)), color = "black", size = 2) +
   scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
   labs(title = "Stock Return Correlations",
        x = "", y = "", fill = "Correlation") +
-  theme_minimal()
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # Save the plot
-ggsave("output/figures/correlation_heatmap.png", width = 8, height = 6)
+ggsave("output/figures/correlation_heatmap.png", width = 12, height = 10)
 print("Saved correlation heatmap to output/figures/")

@@ -1,11 +1,28 @@
 # Load package
 library(quantmod)
 
-# Define stock tickers (8 stocks across different sectors)
-tickers <- c("AAPL", "MSFT", "JPM", "JNJ", "XOM", "WMT", "DIS", "TSLA")
+# Define stock tickers (20 stocks across different sectors)
+tickers <- c(
+  # Technology
+  "AAPL", "MSFT", "GOOGL", "NVDA",
+  # Finance
+  "JPM", "V", "BAC",
+  # Healthcare
+  "JNJ", "PFE", "UNH",
+  # Energy
+  "XOM", "CVX",
+  # Retail
+  "WMT", "AMZN", "COST",
+  # Entertainment
+  "DIS", "NFLX",
+  # Automotive
+  "TSLA", "F",
+  # Industrial
+  "CAT"
+  )
 
-# Set date range (5 years of data)
-start_date <- "2020-01-01"
+# Set date range (10 years of data)
+start_date <- "2015-01-01"
 end_date <- Sys.Date()
 
 # Create empty list to store stock data

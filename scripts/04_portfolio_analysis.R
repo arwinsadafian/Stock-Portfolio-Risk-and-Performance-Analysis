@@ -7,7 +7,24 @@ prices <- readRDS("data/processed/prices_clean.rds")
 returns <- readRDS("data/processed/returns_clean.rds")
 
 # Define tickers
-tickers <- c("AAPL", "MSFT", "JPM", "JNJ", "XOM", "WMT", "DIS", "TSLA")
+tickers <- c(
+  # Technology
+  "AAPL", "MSFT", "GOOGL", "NVDA",
+  # Finance
+  "JPM", "V", "BAC",
+  # Healthcare
+  "JNJ", "PFE", "UNH",
+  # Energy
+  "XOM", "CVX",
+  # Retail
+  "WMT", "AMZN", "COST",
+  # Entertainment
+  "DIS", "NFLX",
+  # Automotive
+  "TSLA", "F",
+  # Industrial
+  "CAT"
+)
 
 # Number of stocks
 n_stocks <- length(tickers)
@@ -32,22 +49,24 @@ print("Inverse Volatility Weights:")
 print(round(vol_weights, 3))
 
 # Strategy 3: Sector-Balanced Portfolio
-# Tech (AAPL, MSFT, TSLA): 30% total
-# Finance (JPM): 20%
-# Healthcare (JNJ): 20%
-# Energy (XOM): 10%
-# Retail (WMT): 10%
-# Entertainment (DIS): 10%
-
+# Allocate by sector, then divide within sector
 sector_weights <- c(
-  AAPL = 0.10,
-  MSFT = 0.10,
-  JPM = 0.20,
-  JNJ = 0.20,
-  XOM = 0.10,
-  WMT = 0.10,
-  DIS = 0.10,
-  TSLA = 0.10
+  # Technology (25% total / 4 stocks = 6.25% each)
+  AAPL = 0.0625, MSFT = 0.0625, GOOGL = 0.0625, NVDA = 0.0625,
+  # Finance (15% total / 3 stocks = 5% each)
+  JPM = 0.05, V = 0.05, BAC = 0.05,
+  # Healthcare (15% total / 3 stocks = 5% each)
+  JNJ = 0.05, PFE = 0.05, UNH = 0.05,
+  # Energy (10% total / 2 stocks = 5% each)
+  XOM = 0.05, CVX = 0.05,
+  # Retail (15% total / 3 stocks = 5% each)
+  WMT = 0.05, AMZN = 0.05, COST = 0.05,
+  # Entertainment (10% total / 2 stocks = 5% each)
+  DIS = 0.05, NFLX = 0.05,
+  # Automotive (5% total / 2 stocks = 2.5% each)
+  TSLA = 0.025, F = 0.025,
+  # Industrial (5% total / 1 stock)
+  CAT = 0.05
 )
 
 print("Sector-Balanced Weights:")
@@ -98,8 +117,8 @@ portfolio_long <- tidyr::pivot_longer(portfolio_cumulative,
                                       names_to = "Portfolio",
                                       values_to = "Value")
 
-ggplot(portfolio_long, aes(x = Date, y = Value, color = Portfolio)) +
-  geom_line() +
+ggplot(portfolio_long, aes(x = Date, y = Value, color = Portfolio, linetype = Portfolio)) +
+  geom_line(linewidth = 1) +
   geom_hline(yintercept = 100, linetype = "dashed", color = "gray") +
   labs(title = "Portfolio Performance: Growth of $100",
        x = "Date",

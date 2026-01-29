@@ -1,5 +1,5 @@
 "Test","Result"
-"Individual stock returns != 0","AAPL, WMT, TSLA significant"
+"Individual stock returns != 0","AAPL, MSFT, GOOGL, NVDA, JPM, V, JNJ, WMT, AMZN, COST, NFLX, TSLA, CAT significant (13/20)"
 "Equal beats SP500","YES (significant)"
 "Sector beats SP500","YES (significant)"
 "Returns normally distributed","NO (none are normal)"

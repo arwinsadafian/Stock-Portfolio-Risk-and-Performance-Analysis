@@ -4,7 +4,24 @@ library(tidyr)
 library(lubridate)
 
 # Define tickers (same as before)
-tickers <- c("AAPL", "MSFT", "JPM", "JNJ", "XOM", "WMT", "DIS", "TSLA")
+tickers <- c(
+  # Technology
+  "AAPL", "MSFT", "GOOGL", "NVDA",
+  # Finance
+  "JPM", "V", "BAC",
+  # Healthcare
+  "JNJ", "PFE", "UNH",
+  # Energy
+  "XOM", "CVX",
+  # Retail
+  "WMT", "AMZN", "COST",
+  # Entertainment
+  "DIS", "NFLX",
+  # Automotive
+  "TSLA", "F",
+  # Industrial
+  "CAT"
+)
 
 # Load all stock data from files
 stock_data <- list()

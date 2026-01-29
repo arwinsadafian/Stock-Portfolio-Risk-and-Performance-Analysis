@@ -6,7 +6,24 @@ returns <- readRDS("data/processed/returns_clean.rds")
 portfolio_returns <- readRDS("data/processed/portfolio_returns.rds")
 
 # Define tickers
-tickers <- c("AAPL", "MSFT", "JPM", "JNJ", "XOM", "WMT", "DIS", "TSLA")
+tickers <- c(
+  # Technology
+  "AAPL", "MSFT", "GOOGL", "NVDA",
+  # Finance
+  "JPM", "V", "BAC",
+  # Healthcare
+  "JNJ", "PFE", "UNH",
+  # Energy
+  "XOM", "CVX",
+  # Retail
+  "WMT", "AMZN", "COST",
+  # Entertainment
+  "DIS", "NFLX",
+  # Automotive
+  "TSLA", "F",
+  # Industrial
+  "CAT"
+)
 
 # Test 1: Is each stock's average return significantly different from zero?
 # Using one-sample t-test
@@ -63,7 +80,7 @@ test_summary <- data.frame(
            "Equal beats SP500", 
            "Sector beats SP500",
            "Returns normally distributed"),
-  Result = c("AAPL, WMT, TSLA significant",
+  Result = c("AAPL, MSFT, GOOGL, NVDA, JPM, V, JNJ, WMT, AMZN, COST, NFLX, TSLA, CAT significant (13/20)",
              "YES (significant)",
              "YES (significant)",
              "NO (none are normal)")

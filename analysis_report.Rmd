@@ -1,136 +1,214 @@
 ---
 title: "Stock Portfolio Risk-Return Analysis"
 author: "Arwin Sadafian"
-date: "January 28, 2026"
-output: html_document
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
 ---
-## Executive Summary
 
-This analysis examines 20 stocks across different sectors from 2015-2025 to build and compare portfolio strategies. Key findings:
-
-- **Best performing portfolio**: Sector-Balanced strategy
-- **Best risk-adjusted returns**: Check metrics table below
-- **Top performer**: NVDA (highest growth over 10 years)
-- **Most volatile stock**: TSLA
-- **Most stable stock**: JNJ
-- **Statistical validation**: All portfolios significantly outperformed the S&P 500
-
-## Data Overview
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+# Load packages
 library(dplyr)
 library(ggplot2)
 library(tidyr)
 library(reshape2)
 
-# Load all data
-prices <- readRDS("data/processed/prices_clean.rds")
-returns <- readRDS("data/processed/returns_clean.rds")
-portfolio_returns <- readRDS("data/processed/portfolio_returns.rds")
-portfolio_cumulative <- readRDS("data/processed/portfolio_cumulative.rds")
-metrics <- readRDS("data/processed/portfolio_metrics.rds")
+# Source configuration
+source("scripts/00_config.R")
 
-tickers <- c("AAPL", "MSFT", "GOOGL", "NVDA", "JPM", "V", "BAC", "JNJ", "PFE", "UNH",
-             "XOM", "CVX", "WMT", "AMZN", "COST", "DIS", "NFLX", "TSLA", "F", "CAT")
+# Load all data
+prices <- readRDS(paste0(paths$processed_data, "prices_clean.rds"))
+returns <- readRDS(paste0(paths$processed_data, "returns_clean.rds"))
+prices_train <- readRDS(paste0(paths$processed_data, "prices_train.rds"))
+returns_train <- readRDS(paste0(paths$processed_data, "returns_train.rds"))
+prices_test <- readRDS(paste0(paths$processed_data, "prices_test.rds"))
+returns_test <- readRDS(paste0(paths$processed_data, "returns_test.rds"))
+portfolio_returns <- readRDS(paste0(paths$processed_data, "portfolio_returns.rds"))
+portfolio_cumulative <- readRDS(paste0(paths$processed_data, "portfolio_cumulative.rds"))
+metrics_all <- readRDS(paste0(paths$processed_data, "portfolio_metrics.rds"))
+metrics_train <- readRDS(paste0(paths$processed_data, "metrics_train.rds"))
+metrics_test <- readRDS(paste0(paths$processed_data, "metrics_test.rds"))
+stat_tests <- readRDS(paste0(paths$processed_data, "statistical_tests.rds"))
+
+# Filter portfolio returns by period
+portfolio_returns_test <- portfolio_returns %>% filter(Period == "Test")
+
+# Split date for visualization
+split_date <- as.Date(train_end_date)
 ```
+
+## Executive Summary
+
+This analysis examines **`r length(tickers)` stocks** across 8 sectors from **`r start_date`** to **`r end_date`** using rigorous methodology:
+
+- **Walk-forward validation**: Strategies developed on 2015-2020, tested on 2021-2025
+- **Rolling windows**: Volatility weights use trailing 252-day data (no look-ahead bias)
+- **Transaction costs**: 0.1% per trade with quarterly rebalancing
+- **Non-parametric statistics**: Wilcoxon and bootstrap tests (appropriate for non-normal returns)
+
+### Key Findings (Out-of-Sample: 2021-2025)
+
+```{r summary-metrics}
+best_return <- metrics_test$Portfolio[which.max(metrics_test$Annual_Return)]
+best_sharpe <- metrics_test$Portfolio[which.max(metrics_test$Sharpe_Ratio)]
+```
+
+| Metric | Result |
+|--------|--------|
+| Best annual return | **`r best_return`** (`r max(metrics_test$Annual_Return)`%) |
+| Best risk-adjusted (Sharpe) | **`r best_sharpe`** (`r max(metrics_test$Sharpe_Ratio)`) |
+| Portfolios beating S&P 500 | `r paste(stat_tests$portfolio_tests$Portfolio[stat_tests$portfolio_tests$Significant == "YES"], collapse = ", ")` |
+
+---
+
+## Methodology
+
+### Walk-Forward Validation
+
+```{r methodology-table}
+method_df <- data.frame(
+  Period = c("Training", "Testing"),
+  Dates = c(paste(start_date, "to", train_end_date), 
+            paste(test_start_date, "to", end_date)),
+  Purpose = c("Develop strategies, calculate initial weights", 
+              "Out-of-sample evaluation (results reported here)"),
+  Days = c(nrow(returns_train), nrow(returns_test))
+)
+knitr::kable(method_df, caption = "Data Split for Walk-Forward Validation")
+```
+
+### Parameters
+
+| Parameter | Value |
+|-----------|-------|
+| Rolling window for volatility | `r rolling_window` days (1 year) |
+| Rebalancing frequency | `r rebalance_frequency` days (quarterly) |
+| Transaction cost | `r transaction_cost * 100`% per trade |
+| Risk-free rate (Sharpe) | `r risk_free_rate * 100`% annual |
+
+---
+
+## Data Overview
 
 **Stocks analyzed:** `r length(tickers)` stocks across 8 sectors
 
-**Time period:** `r min(prices$Date)` to `r max(prices$Date)`
+**Full period:** `r min(prices$Date)` to `r max(prices$Date)` (`r nrow(returns)` trading days)
 
-**Trading days:** `r nrow(returns)`
+### Stocks by Sector
+
+```{r sector-table}
+sector_df <- data.frame(
+  Sector = names(sector_mapping),
+  Stocks = sapply(sector_mapping, function(x) paste(x, collapse = ", ")),
+  Allocation = paste0(sector_allocations * 100, "%")
+)
+knitr::kable(sector_df, caption = "Stock Selection by Sector")
+```
+
+---
 
 ## Stock Performance
 
-### Top 5 Performers
-```{r top5-chart, fig.width=10, fig.height=5}
+### Price History
+
+```{r price-history, fig.width=12, fig.height=6}
+prices_long <- pivot_longer(prices, cols = all_of(tickers), 
+                             names_to = "Stock", values_to = "Price")
+
+ggplot(prices_long, aes(x = Date, y = Price, color = Stock)) +
+  geom_line(alpha = 0.7) +
+  geom_vline(xintercept = split_date, linetype = "dashed", color = "red", linewidth = 1) +
+  annotate("text", x = split_date, y = max(prices_long$Price) * 0.95, 
+           label = "Train/Test Split", hjust = -0.1, color = "red", fontface = "bold") +
+  labs(title = "Stock Prices Over Time",
+       subtitle = "Red line indicates training/testing split (Dec 2020)",
+       x = "Date", y = "Price ($)") +
+  theme_minimal()
+```
+
+### Top and Bottom Performers
+
+```{r normalized-prices, fig.width=12, fig.height=5}
+# Normalize prices
 prices_normalized <- prices
-for(col in tickers) {
+for (col in tickers) {
   prices_normalized[[col]] <- prices[[col]] / prices[[col]][1] * 100
 }
 
+# Calculate total returns
 total_returns <- sapply(tickers, function(t) {
   (prices_normalized[[t]][nrow(prices_normalized)] / 100 - 1) * 100
 })
 total_returns_sorted <- sort(total_returns, decreasing = TRUE)
-
 top_5 <- names(total_returns_sorted)[1:5]
+bottom_5 <- names(total_returns_sorted)[(length(tickers)-4):length(tickers)]
 
-prices_top <- pivot_longer(prices_normalized,
-                           cols = all_of(top_5),
-                           names_to = "Stock",
-                           values_to = "Price")
+# Top 5 chart
+prices_top <- pivot_longer(prices_normalized, cols = all_of(top_5),
+                            names_to = "Stock", values_to = "Price")
 
 ggplot(prices_top, aes(x = Date, y = Price, color = Stock)) +
   geom_line() +
   geom_hline(yintercept = 100, linetype = "dashed", color = "gray") +
+  geom_vline(xintercept = split_date, linetype = "dashed", color = "red") +
   scale_y_log10() +
   labs(title = "Top 5 Performing Stocks (Log Scale)",
-       x = "Date",
-       y = "Indexed Price (Start = 100)") +
+       subtitle = "Normalized to 100 at start",
+       x = "Date", y = "Indexed Price (Start = 100)") +
   theme_minimal()
 ```
 
-### Bottom 5 Performers
-```{r bottom5-chart, fig.width=10, fig.height=5}
-bottom_5 <- names(total_returns_sorted)[16:20]
+### Return Statistics (Training Period)
 
-prices_bottom <- pivot_longer(prices_normalized,
-                              cols = all_of(bottom_5),
-                              names_to = "Stock",
-                              values_to = "Price")
-
-ggplot(prices_bottom, aes(x = Date, y = Price, color = Stock)) +
-  geom_line() +
-  geom_hline(yintercept = 100, linetype = "dashed", color = "gray") +
-  scale_y_log10() +
-  labs(title = "Bottom 5 Performing Stocks (Log Scale)",
-       x = "Date",
-       y = "Indexed Price (Start = 100)") +
-  theme_minimal()
-```
-
-### Return Statistics
 ```{r return-stats}
 stats <- data.frame(
   Ticker = tickers,
-  Mean_Return = round(sapply(returns[, tickers], mean), 3),
-  Std_Dev = round(sapply(returns[, tickers], sd), 3),
-  Min = round(sapply(returns[, tickers], min), 2),
-  Max = round(sapply(returns[, tickers], max), 2)
+  Mean_Return = round(sapply(returns_train[, tickers], mean), 4),
+  Std_Dev = round(sapply(returns_train[, tickers], sd), 4),
+  Min = round(sapply(returns_train[, tickers], min), 2),
+  Max = round(sapply(returns_train[, tickers], max), 2)
 )
-knitr::kable(stats, caption = "Daily Return Statistics (%)")
+stats <- stats[order(-stats$Mean_Return), ]
+knitr::kable(stats, caption = "Daily Return Statistics - Training Period 2015-2020 (%)", row.names = FALSE)
 ```
+
+---
 
 ## Risk Analysis
 
 ### Return Distribution
-```{r boxplot, fig.width=12, fig.height=6}
-returns_long <- pivot_longer(returns, 
-                              cols = all_of(tickers),
-                              names_to = "Stock",
-                              values_to = "Return")
 
-ggplot(returns_long, aes(x = Stock, y = Return, fill = Stock)) +
-  geom_boxplot() +
-  labs(title = "Distribution of Daily Returns by Stock",
-       x = "Stock",
-       y = "Daily Return (%)") +
+```{r boxplot, fig.width=12, fig.height=6}
+returns_long <- pivot_longer(returns_train, cols = all_of(tickers),
+                              names_to = "Stock", values_to = "Return")
+
+ggplot(returns_long, aes(x = reorder(Stock, Return, FUN = sd), y = Return, fill = Stock)) +
+  geom_boxplot(outlier.size = 0.5) +
+  labs(title = "Distribution of Daily Returns (Training Period: 2015-2020)",
+       subtitle = "Ordered by volatility (standard deviation)",
+       x = "Stock", y = "Daily Return (%)") +
   theme_minimal() +
   theme(legend.position = "none",
         axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ### Correlation Analysis
+
 ```{r correlation, fig.width=12, fig.height=10}
-cor_matrix <- cor(returns[, tickers])
+cor_matrix <- cor(returns_train[, tickers])
 cor_melted <- melt(cor_matrix)
 
 ggplot(cor_melted, aes(x = Var1, y = Var2, fill = value)) +
   geom_tile() +
   geom_text(aes(label = round(value, 2)), color = "black", size = 2) +
   scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
-  labs(title = "Stock Return Correlations",
+  labs(title = "Stock Return Correlations (Training Period: 2015-2020)",
        x = "", y = "", fill = "Correlation") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -138,86 +216,154 @@ ggplot(cor_melted, aes(x = Var1, y = Var2, fill = value)) +
 
 **Key observations:**
 
-- Technology stocks (AAPL, MSFT, GOOGL, NVDA) show high correlation with each other
-- Energy stocks (XOM, CVX) are highly correlated (0.83)
-- Finance stocks (JPM, BAC) show strong correlation (0.88)
+- Technology stocks show high correlation with each other
+- Energy stocks (XOM, CVX) are highly correlated
 - Low correlation pairs provide diversification benefits
+
+---
 
 ## Portfolio Strategies
 
-Three portfolio strategies were constructed:
+### Strategy Descriptions
 
-1. **Equal Weight**: 5% in each stock
-2. **Inverse Volatility**: Higher weight to stable stocks, lower to volatile
-3. **Sector-Balanced**: Tech 25%, Healthcare 15%, Finance 15%, Retail 15%, Energy 10%, Entertainment 10%, Automotive 5%, Industrial 5%
+| Strategy | Description | Rebalancing |
+|----------|-------------|-------------|
+| **Equal Weight** | 5% in each stock | None (static weights) |
+| **Inverse Volatility** | Higher weight to stable stocks, calculated using trailing 252-day volatility | Quarterly |
+| **Sector-Balanced** | Weights based on sector allocation (Tech 25%, etc.) | None (static weights) |
 
 ### Portfolio Performance
-```{r portfolio-chart, fig.width=10, fig.height=5}
+
+```{r portfolio-performance, fig.width=12, fig.height=7}
 portfolio_long <- pivot_longer(portfolio_cumulative,
                                 cols = c(Equal, Volatility, Sector, SP500),
-                                names_to = "Portfolio",
-                                values_to = "Value")
+                                names_to = "Portfolio", values_to = "Value")
 
 ggplot(portfolio_long, aes(x = Date, y = Value, color = Portfolio, linetype = Portfolio)) +
   geom_line(linewidth = 1) +
   geom_hline(yintercept = 100, linetype = "dashed", color = "gray") +
+  geom_vline(xintercept = split_date, linetype = "dashed", color = "red", linewidth = 1) +
+  annotate("text", x = split_date - 200, y = max(portfolio_long$Value) * 0.9, 
+           label = "Training", hjust = 1, color = "darkgreen", fontface = "bold", size = 4) +
+  annotate("text", x = split_date + 200, y = max(portfolio_long$Value) * 0.9, 
+           label = "Testing\n(Out-of-Sample)", hjust = 0, color = "darkblue", fontface = "bold", size = 4) +
   labs(title = "Portfolio Performance: Growth of $100",
-       x = "Date",
-       y = "Portfolio Value ($)") +
-  theme_minimal()
+       subtitle = paste("Rebalancing:", rebalance_frequency, "days | Transaction cost:", 
+                        transaction_cost * 100, "%"),
+       x = "Date", y = "Portfolio Value ($)") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
 ```
 
 ### Performance Metrics
-```{r metrics}
-knitr::kable(metrics, caption = "Portfolio Performance Comparison")
+
+#### Training Period (2015-2020) — In-Sample
+
+```{r metrics-train}
+knitr::kable(metrics_train[, -2], caption = "Portfolio Metrics - Training Period")
 ```
+
+#### Testing Period (2021-2025) — Out-of-Sample
+
+```{r metrics-test}
+knitr::kable(metrics_test[, -2], caption = "Portfolio Metrics - Testing Period (REPORTED RESULTS)")
+```
+
+**Note:** The testing period results are out-of-sample — the strategies were developed without seeing this data.
+
+---
 
 ## Statistical Testing
 
-### Key Findings
-```{r stat-tests}
-equal_test <- t.test(portfolio_returns$Equal, portfolio_returns$SP500, paired = TRUE)
-sector_test <- t.test(portfolio_returns$Sector, portfolio_returns$SP500, paired = TRUE)
-vol_test <- t.test(portfolio_returns$Volatility, portfolio_returns$SP500, paired = TRUE)
-
-test_results <- data.frame(
-  Portfolio = c("Equal", "Volatility", "Sector"),
-  Mean_Difference = round(c(
-    mean(portfolio_returns$Equal - portfolio_returns$SP500),
-    mean(portfolio_returns$Volatility - portfolio_returns$SP500),
-    mean(portfolio_returns$Sector - portfolio_returns$SP500)
-  ), 4),
-  P_Value = round(c(equal_test$p.value, vol_test$p.value, sector_test$p.value), 4),
-  Significant = c(
-    ifelse(equal_test$p.value < 0.05, "Yes", "No"),
-    ifelse(vol_test$p.value < 0.05, "Yes", "No"),
-    ifelse(sector_test$p.value < 0.05, "Yes", "No")
-  )
-)
-knitr::kable(test_results, caption = "T-Test: Portfolio vs S&P 500")
-```
-
-### Individual Stock Significance
-
-Out of 20 stocks analyzed, 13 showed statistically significant positive returns (p < 0.05):
-AAPL, MSFT, GOOGL, NVDA, JPM, V, JNJ, WMT, AMZN, COST, NFLX, TSLA, CAT
+All statistical tests use **out-of-sample data only** (2021-2025) and **non-parametric methods** appropriate for non-normal financial returns.
 
 ### Normality of Returns
 
-Stock returns do not follow a normal distribution (Shapiro-Wilk test, all p < 0.001). This indicates fat tails and the presence of extreme events, which is typical for financial data.
+```{r normality}
+avg_kurtosis <- round(mean(stat_tests$normality_tests$Kurtosis), 2)
+avg_skewness <- round(mean(stat_tests$normality_tests$Skewness), 3)
+```
 
+Stock returns are **not normally distributed** (Shapiro-Wilk test, all p < 0.001):
+
+- Average excess kurtosis: **`r avg_kurtosis`** (normal = 0; positive = fat tails)
+- Average skewness: **`r avg_skewness`**
+
+This confirms that t-tests are inappropriate. We use **Wilcoxon signed-rank tests** and **bootstrap methods** instead.
+
+### Portfolio vs S&P 500 (Wilcoxon Test)
+
+```{r portfolio-tests}
+knitr::kable(stat_tests$portfolio_tests, 
+             caption = "Wilcoxon Signed-Rank Test: Portfolio vs S&P 500 (Testing Period)")
+```
+
+### Sharpe Ratio Comparison (Bootstrap)
+
+```{r sharpe-tests}
+knitr::kable(stat_tests$sharpe_tests,
+             caption = "Bootstrap Test: Sharpe Ratio vs S&P 500 (Testing Period)")
+```
+
+---
+  
 ## Conclusions
 
-1. **Sector-Balanced portfolio performed best** with the highest total return due to higher tech allocation
-2. **Diversification works**: Including stocks from different sectors reduced overall portfolio volatility
-3. **NVDA dominates returns**: Exceptional growth over 10 years, but with high volatility
-4. **All portfolios beat S&P 500**: Statistical evidence confirms outperformance (p < 0.05)
-5. **Risk-return tradeoff**: Higher returns generally came with higher volatility
+Based on **out-of-sample testing** (2021-2025) with proper methodology:
+
+```{r conclusions}
+# Dynamic conclusions based on results
+sig_portfolios <- stat_tests$portfolio_tests$Portfolio[stat_tests$portfolio_tests$Significant == "YES"]
+sig_sharpe <- stat_tests$sharpe_tests$Portfolio[stat_tests$sharpe_tests$Significant == "YES"]
+```
+
+1. **`r best_return`** achieved the highest annual return (`r max(metrics_test$Annual_Return)`%) in the out-of-sample period
+
+2. **`r best_sharpe`** had the best risk-adjusted return (Sharpe ratio: `r max(metrics_test$Sharpe_Ratio)`)
+
+3. **Portfolios significantly outperforming S&P 500** (Wilcoxon test, p < 0.05): `r if(length(sig_portfolios) > 0) paste(sig_portfolios, collapse = ", ") else "None"`
+
+4. **Non-normal returns confirmed**: All stocks show fat tails (average kurtosis: `r avg_kurtosis`), justifying non-parametric tests
+
+5. **Transaction costs matter**: 0.1% per trade with quarterly rebalancing reduced returns from theoretical maximums
+
+---
 
 ## Limitations
 
-- Analysis covers only 10 years (2015-2025)
-- Only 20 stocks examined (S&P 500 has 500)
-- Past performance does not guarantee future results
-- Transaction costs and taxes not considered
-- Survivorship bias: Only includes stocks that exist today
+### Addressed in This Analysis
+
+| Issue | How Addressed |
+|-------|---------------|
+| Look-ahead bias | Rolling 252-day window for volatility weights |
+| In-sample overfitting | Walk-forward validation (train/test split) |
+| Invalid statistics | Non-parametric tests (Wilcoxon, bootstrap) |
+| No trading costs | 0.1% transaction cost per trade included |
+
+### Still Present
+
+| Limitation | Impact |
+|------------|--------|
+| **Survivorship bias** | Only stocks existing today are analyzed; failed companies excluded |
+| **Stock selection bias** | Well-known large-caps chosen; random selection might perform worse |
+| **Limited test period** | 2021-2025 was mostly bullish; bear market performance unknown |
+| **Underestimated costs** | Real bid-ask spreads, market impact, taxes not included |
+| **20 vs 500 stocks** | S&P 500 is more diversified; comparison not perfectly fair |
+
+### What This Analysis Can and Cannot Claim
+
+✓ Methodology is more rigorous than typical tutorials  
+✓ Out-of-sample results suggest strategies have some validity  
+✓ Diversification across sectors reduced volatility  
+
+✗ These strategies will work in the future  
+✗ Results constitute investment advice  
+✗ Professional managers couldn't do better  
+
+---
+
+**This is an educational project demonstrating data analysis methodology, not investment advice.**
+
+---
+
+*Report generated on `r Sys.Date()` using R `r getRversion()`*

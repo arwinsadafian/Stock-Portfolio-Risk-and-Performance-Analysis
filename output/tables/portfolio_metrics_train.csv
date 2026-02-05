@@ -1,0 +1,5 @@
+"Portfolio","Period","Annual_Return","Annual_Volatility","Sharpe_Ratio","Max_Drawdown"
+"Equal","Train",24.2,20.24,1.19,32.62
+"Volatility","Train",21.25,19.04,1.12,30.44
+"Sector","Train",24.55,20.23,1.21,31.47
+"SP500","Train",11.79,18.66,0.63,33.92

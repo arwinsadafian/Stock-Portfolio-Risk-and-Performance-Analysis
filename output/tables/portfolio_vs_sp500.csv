@@ -1,0 +1,4 @@
+"Portfolio","Mean_Difference","Wilcoxon_P","Boot_CI_Lower","Boot_CI_Upper","Significant"
+"Equal",0.0294,0.0035,0.0091,0.0499,"YES"
+"Volatility",0.0219,0.0174,8e-04,0.0429,"YES"
+"Sector",0.0314,6e-04,0.0132,0.0496,"YES"
